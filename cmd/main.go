@@ -30,9 +30,18 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"runtime/pprof"
 )
 
 func main() {
+
+	f, err := os.Create("cpu_profile")
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	pprof.StartCPUProfile(f)
+	defer pprof.StopCPUProfile()
+
 	app := newApp()
 	app.Action = startNode
 	app.HideVersion = true // we have a command to print the version
