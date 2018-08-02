@@ -31,16 +31,12 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime/pprof"
+	"time"
 )
 
 func main() {
 
-	f, err := os.Create("cpu_profile")
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	pprof.StartCPUProfile(f)
-	defer pprof.StopCPUProfile()
+
 
 	app := newApp()
 	app.Action = startNode
@@ -90,6 +86,20 @@ func startNode(ctx *cli.Context) error {
 				}
 				os.Exit(1)
 			}
+		}
+	}()
+
+	f, err := os.Create("cpu_profile")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	pprof.StartCPUProfile(f)
+	defer pprof.StopCPUProfile()
+
+	go func() {
+		for {
+			time.Sleep(5 * time.Second)
+			fmt.Println(runtime.NumGoroutine())
 		}
 	}()
 

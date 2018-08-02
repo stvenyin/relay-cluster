@@ -302,6 +302,13 @@ func (so *SocketIOServiceImpl) Start() {
 		if len(infos) == 2 {
 			so.connIdMap.Delete(infos[0])
 		}
+		count := 0
+		so.connIdMap.Range(func(key, value interface{}) bool {
+
+			count++
+			return true
+		})
+		fmt.Printf("current conn count is : %d \n", count)
 
 	})
 
