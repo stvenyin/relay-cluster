@@ -23,6 +23,7 @@ import (
 	"github.com/Loopring/relay-lib/eventemitter"
 	"github.com/Loopring/relay-lib/types"
 	"math/big"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -49,7 +50,8 @@ func SaveP2POrderRelation(takerOwner, taker, makerOwner, maker, txHash, pendingA
 	cache.SAdd(p2pOrderPreKey+makerOwner, DefaultP2POrderExpireTime, []byte(maker))
 	cache.Set(p2pRelationPreKey+taker, []byte(txHash), DefaultP2POrderExpireTime)
 	cache.Set(p2pRelationPreKey+maker, []byte(txHash), DefaultP2POrderExpireTime)
-	cache.ZAdd(maker, time.Now().UnixNano()/int64(1000000), []byte(txHash+splitMark+pendingAmount))
+	p2pOrderExpiredTime := time.Now().UnixNano() / int64(1000000)
+	cache.ZAdd(maker, p2pOrderExpiredTime, []byte(strconv.FormatInt(p2pOrderExpiredTime, 10)), []byte(txHash+splitMark+pendingAmount))
 	return nil
 }
 
@@ -72,6 +74,7 @@ func HandleP2PRingMined(input eventemitter.EventData) error {
 
 func GetP2PPendingAmount(maker string) (pendingAmount *big.Rat, err error) {
 	pendingAmount = new(big.Rat)
+	maker = strings.ToLower(maker)
 	nowTime := time.Now()
 	untilTime := nowTime.UnixNano() / int64(1000000)
 	sinceTime := nowTime.Add(-2*time.Minute).UnixNano() / int64(1000000)
