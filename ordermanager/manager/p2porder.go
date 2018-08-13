@@ -22,19 +22,22 @@ import (
 	"github.com/Loopring/relay-lib/cache"
 	"github.com/Loopring/relay-lib/eventemitter"
 	"github.com/Loopring/relay-lib/types"
+	"math/big"
 	"strings"
+	"time"
 )
 
 const DefaultP2POrderExpireTime = 3600 * 24 * 7
 const p2pOrderPreKey = "P2P_OWNER_"
 const p2pRelationPreKey = "P2P_RELATION_"
+const splitMark = "_"
 
 func init() {
 	p2pRingMinedWatcher := &eventemitter.Watcher{Concurrent: false, Handle: HandleP2PRingMined}
 	eventemitter.On(eventemitter.OrderFilled, p2pRingMinedWatcher)
 }
 
-func SaveP2POrderRelation(takerOwner, taker, makerOwner, maker, txHash string) error {
+func SaveP2POrderRelation(takerOwner, taker, makerOwner, maker, txHash, pendingAmount string) error {
 
 	takerOwner = strings.ToLower(takerOwner)
 	taker = strings.ToLower(taker)
@@ -46,6 +49,7 @@ func SaveP2POrderRelation(takerOwner, taker, makerOwner, maker, txHash string) e
 	cache.SAdd(p2pOrderPreKey+makerOwner, DefaultP2POrderExpireTime, []byte(maker))
 	cache.Set(p2pRelationPreKey+taker, []byte(txHash), DefaultP2POrderExpireTime)
 	cache.Set(p2pRelationPreKey+maker, []byte(txHash), DefaultP2POrderExpireTime)
+	cache.ZAdd(maker, time.Now().UnixNano()/int64(1000000), []byte(txHash+splitMark+pendingAmount))
 	return nil
 }
 
@@ -64,4 +68,20 @@ func HandleP2PRingMined(input eventemitter.EventData) error {
 		cache.Del(p2pRelationPreKey + strings.ToLower(evt.NextOrderHash.Hex()))
 	}
 	return nil
+}
+
+func GetP2PPendingAmount(maker string) (pendingAmount *big.Rat, err error) {
+	pendingAmount = new(big.Rat)
+	nowTime := time.Now()
+	untilTime := nowTime.UnixNano() / int64(1000000)
+	sinceTime := nowTime.Add(-2*time.Minute).UnixNano() / int64(1000000)
+	if data, err := cache.ZRange(maker, sinceTime, untilTime, false); nil != err {
+		return pendingAmount, err
+	} else {
+		for _, v := range data {
+			pendData, _ := new(big.Int).SetString(strings.Split(string(v), splitMark)[1], 0)
+			pendingAmount = pendingAmount.Add(pendingAmount, new(big.Rat).SetInt(pendData))
+		}
+		return pendingAmount, nil
+	}
 }
