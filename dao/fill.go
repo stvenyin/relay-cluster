@@ -182,7 +182,6 @@ func buildTimeQueryString(start, end int64) string {
 	rst := ""
 	if start != 0 && end == 0 {
 		rst += "create_time >= " + fmt.Sprintf("%v", start)
-	} else if start != 0 && end != 0 {
 		rst += "create_time >= " + fmt.Sprintf("%v", start) + " AND create_time <= " + fmt.Sprintf("%v", end)
 	} else if start == 0 && end != 0 {
 		rst += "create_time <= " + fmt.Sprintf("%v", end)
@@ -203,6 +202,9 @@ func (s *RdsService) GetFillForkEvents(from, to int64) ([]FillEvent, error) {
 	return list, err
 }
 
-func (s *RdsService) RollBackFill(from, to int64) error {
-	return s.Db.Model(&FillEvent{}).Where("block_number > ? and block_number <= ?", from, to).Update("fork", true).Error
+func (s *RdsService) RollBackFill(from, to int64) (error, []string) {
+	var owners []string
+	s.Db.Model(&FillEvent{}).Where("block_number > ? and block_number <= ?", from, to).Pluck("DISTINCT owner", &owners)
+	res := s.Db.Model(&FillEvent{}).Where("block_number > ? and block_number <= ?", from, to).Update("fork", true)
+	return res.Error, owners
 }
