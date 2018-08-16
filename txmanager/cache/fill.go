@@ -23,6 +23,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"strings"
 	"github.com/Loopring/relay-lib/log"
+	"github.com/Loopring/relay-cluster/dao"
+	"encoding/json"
 )
 
 // 该缓存模块用于处理fill数据
@@ -49,6 +51,32 @@ func ExistFillOwnerCache(txhash common.Hash, owner common.Address) (bool, error)
 
 func generateFillOwnerKey(txhash common.Hash) string {
 	return FillOwnerPrefix + txhash.Hex()
+}
+
+func GetCacheFills(key string, res *dao.PageResult) (err error, get bool) {
+	if fillsByte, err := cache.Get(FillSearchPreKey + key); err != nil {
+		return err, false
+	} else if len(fillsByte) > 0 {
+		data := make([]interface{}, 0)
+		fills := make([]dao.FillEvent, 0)
+		json.Unmarshal(fillsByte, &res)
+		if r, _ := json.Marshal(res.Data); r != nil {
+			json.Unmarshal(r, &fills)
+		}
+		for _, v := range fills {
+			data = append(data, v)
+		}
+		res.Data = data
+		log.Debugf("[GetFills Cache] from cache key: %s", FillSearchPreKey+key)
+		return err, true
+	}
+	return nil, false
+}
+
+func SaveCacheFills(key string, res *dao.PageResult, ttl int64) {
+	value, _ := json.Marshal(res)
+	log.Debugf("[GetFills Cache] save cache key: %s", FillSearchPreKey+key)
+	cache.Set(FillSearchPreKey+key, value, ttl)
 }
 
 func DelFillCacheByOwner(owners []string) {

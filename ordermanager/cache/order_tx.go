@@ -23,6 +23,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"strings"
 	"github.com/Loopring/relay-lib/log"
+	"encoding/json"
+	"github.com/Loopring/relay-cluster/dao"
 )
 
 // 注意:这里我们不对cache设置过期时间,如果设定过期时间,会导致event通知到ordermanager后,与订单无关的用户查询mysql,消耗太大
@@ -81,6 +83,32 @@ func getMember(orderhash common.Hash) []byte {
 
 func setMember(bs []byte) common.Hash {
 	return common.HexToHash(string(bs))
+}
+
+func GetCacheOrders(key string, res *dao.PageResult) (err error, get bool) {
+	if ordersByte, err := cache.Get(OrderSearchPreKey + key); err != nil {
+		return err, false
+	} else if len(ordersByte) > 0 {
+		data := make([]interface{}, 0)
+		orders := make([]dao.Order, 0)
+		json.Unmarshal(ordersByte, &res)
+		if r, _ := json.Marshal(res.Data); r != nil {
+			json.Unmarshal(r, &orders)
+		}
+		for _, v := range orders {
+			data = append(data, v)
+		}
+		res.Data = data
+		log.Debugf("[GetOrders Cache] from cache key: %s", OrderSearchPreKey+key)
+		return err, true
+	}
+	return nil, false
+}
+
+func SaveCacheOrders(key string, res *dao.PageResult, ttl int64) {
+	value, _ := json.Marshal(res)
+	log.Debugf("[GetOrders Cache] save cache key: %s", OrderSearchPreKey+key)
+	cache.Set(OrderSearchPreKey+key, value, ttl)
 }
 
 func DelOrderCacheByOwner(owners []string) {
